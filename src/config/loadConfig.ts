@@ -9,13 +9,21 @@ export const loadConfig = async (): Promise<ServerConfig> => {
   const { models } = JSON.parse(await readFile(file, 'utf8')) as { models: ModelConfig[] };
   if (!models?.length) throw new Error(`${file} must contain at least one model.`);
   const executable = process.platform === 'win32' ? 'llama-server.exe' : 'llama-server';
+  const device = process.env.DEVICE || 'gpu';
+  const idleTimeoutMs = Number(process.env.IDLE_TIMEOUT_MS || 300000);
+  if (device !== 'gpu' && device !== 'cpu') throw new Error('DEVICE must be gpu or cpu.');
+  if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 0 || idleTimeoutMs > 2147483647) {
+    throw new Error('IDLE_TIMEOUT_MS must be an integer between 0 and 2147483647.');
+  }
 
   return {
     host: process.env.HOST || '0.0.0.0',
     port: Number(process.env.PORT || 18080),
     apiKey: process.env.API_KEY,
     llamaServerBin: resolve(process.env.LLAMA_SERVER_BIN || `vendor/llama/${executable}`),
+    device,
     gpuLayers: process.env.GPU_LAYERS || 'all',
+    idleTimeoutMs,
     startupTimeoutMs: Number(process.env.STARTUP_TIMEOUT_MS || 180000),
     shutdownTimeoutMs: Number(process.env.SHUTDOWN_TIMEOUT_MS || 10000),
     requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS || 300000),

@@ -4,6 +4,7 @@ import { createServer, type Server } from 'node:http';
 import { test } from 'node:test';
 import type { ServerConfig } from '../src/config/types.js';
 import { createGateway } from '../src/http/createGateway.js';
+import { managedModels } from './managedModels.ts';
 
 const listen = async (server: Server): Promise<number> => {
   server.listen(0, '127.0.0.1');
@@ -37,6 +38,8 @@ test('additional models route by ID for JSON and multipart requests', async (con
     port: 0,
     llamaServerBin: '',
     gpuLayers: 'all',
+    device: 'gpu',
+    idleTimeoutMs: 300000,
     startupTimeoutMs: 1000,
     shutdownTimeoutMs: 1000,
     requestTimeoutMs: 3000,
@@ -50,7 +53,7 @@ test('additional models route by ID for JSON and multipart requests', async (con
     port,
     origin: `http://127.0.0.1:${port}`,
   }));
-  const gateway = createGateway(config, models);
+  const gateway = createGateway(config, managedModels(models));
   const port = await listen(gateway.server);
   const base = `http://127.0.0.1:${port}`;
   context.after(async () => {

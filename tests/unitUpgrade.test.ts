@@ -5,6 +5,7 @@ import { connect } from 'node:net';
 import { test } from 'node:test';
 import type { ServerConfig } from '../src/config/types.js';
 import { createGateway } from '../src/http/createGateway.js';
+import { managedModels } from './managedModels.ts';
 
 test('malformed upgrades are rejected and pending handshakes time out', async (context) => {
   const native = createServer();
@@ -24,21 +25,26 @@ test('malformed upgrades are rejected and pending handshakes time out', async (c
     apiKey: 'test-key',
     llamaServerBin: '',
     gpuLayers: 'all',
+    device: 'gpu',
+    idleTimeoutMs: 300000,
     startupTimeoutMs: 1000,
     shutdownTimeoutMs: 1000,
     requestTimeoutMs: 100,
     maxBodyBytes: 4096,
     models: [],
   };
-  const gateway = createGateway(settings, [
-    {
-      id: 'omni-test',
-      role: 'omni',
-      modelPath: '',
-      port: backend.port,
-      origin: `http://127.0.0.1:${backend.port}`,
-    },
-  ]);
+  const gateway = createGateway(
+    settings,
+    managedModels([
+      {
+        id: 'omni-test',
+        role: 'omni',
+        modelPath: '',
+        port: backend.port,
+        origin: `http://127.0.0.1:${backend.port}`,
+      },
+    ]),
+  );
   gateway.server.listen(0, '127.0.0.1');
   await once(gateway.server, 'listening');
   const address = gateway.server.address();

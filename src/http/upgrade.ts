@@ -1,16 +1,17 @@
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
-import type { RunningModel, ServerConfig } from '../config/types.js';
+import type { RuntimeManager, ServerConfig } from '../config/types.js';
 import { authorized } from '../routes/handleRequest.js';
 import { selectModel } from './selectModel.js';
+import { acquireModel } from './modelLease.js';
 
-export const upgrade = (
+export const upgrade = async (
   request: IncomingMessage,
   socket: Duplex,
   head: Buffer,
   config: ServerConfig,
-  models: RunningModel[],
-): void => {
+  runtimes: RuntimeManager,
+): Promise<void> => {
   socket.on('error', () => socket.destroy());
   let url: URL;
   try {
@@ -19,7 +20,7 @@ export const upgrade = (
     socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
     return;
   }
-  const model = selectModel(models, url.searchParams.get('model'), 'omni');
+  const model = selectModel(runtimes.models, url.searchParams.get('model'), 'omni');
   const status = !authorized(request, config.apiKey)
     ? '401 Unauthorized'
     : url.pathname !== '/v1/realtime' || !model
@@ -29,6 +30,7 @@ export const upgrade = (
     socket.end(`HTTP/1.1 ${status}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
     return;
   }
+  if (!(await acquireModel(runtimes, model!.id, socket, config.requestTimeoutMs, false))) return;
   const headers = { ...request.headers };
   delete headers.host;
   delete headers.authorization;

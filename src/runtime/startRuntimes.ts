@@ -67,6 +67,7 @@ export const startRuntimes = async (
       worker.send({
         executable: config.llamaServerBin,
         model,
+        device: config.device,
         gpuLayers: config.gpuLayers,
         shutdownTimeoutMs: config.shutdownTimeoutMs,
       });

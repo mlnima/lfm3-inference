@@ -53,6 +53,18 @@ process.on('message', (message: WorkerConfig | 'stop') => {
       ? ['--batch-size', '8192', '--ubatch-size', '8192']
       : ['--reasoning', 'off', '--jinja']),
     ...(model.args || []),
+    ...(message.device === 'cpu'
+      ? [
+          '--device',
+          'none',
+          '--n-gpu-layers',
+          '0',
+          '--no-kv-offload',
+          '--no-mmproj-offload',
+          '--mmproj-device',
+          'none',
+        ]
+      : []),
   ];
   child = spawn(message.executable, args, {
     windowsHide: true,

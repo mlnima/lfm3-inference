@@ -16,7 +16,7 @@
     "start": "node dist/main.js",
     "test": "tsx --test tests/unit*.test.ts",
     "test:live": "tsx --test --test-concurrency=1 tests/live*.test.ts",
-    "test:lifecycle": "tsx --test --test-concurrency=1 tests/runtimeLifecycle.ts",
+    "test:lifecycle": "tsx --test --test-concurrency=1 tests/runtimeLifecycle.ts tests/runtimeIdle.ts tests/runtimeCpu.ts",
     "lint": "eslint src scripts tests",
     "format": "prettier --write . --ignore-path .gitignore",
     "format:check": "prettier --check . --ignore-path .gitignore",

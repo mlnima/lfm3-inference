@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import type { RunningModel, ServerConfig } from '../src/config/types.js';
 import { createGateway } from '../src/http/createGateway.js';
 import { floatPcmToInt16 } from '../src/http/pcm.js';
+import { managedModels } from './managedModels.ts';
 
 const listen = async (server: Server): Promise<string> => {
   server.listen(0, '127.0.0.1');
@@ -20,6 +21,8 @@ const settings: ServerConfig = {
   apiKey: 'test-key',
   llamaServerBin: '',
   gpuLayers: 'all',
+  device: 'gpu',
+  idleTimeoutMs: 300000,
   startupTimeoutMs: 1000,
   shutdownTimeoutMs: 1000,
   requestTimeoutMs: 3000,
@@ -54,7 +57,7 @@ test('gateway routes models and preserves binary and event stream responses', as
     { id: 'omni-test', role: 'omni', modelPath: '', port: 0, origin },
     { id: 'decision-test', role: 'decision', modelPath: '', port: 0, origin },
   ];
-  const gateway = createGateway(settings, models);
+  const gateway = createGateway(settings, managedModels(models));
   const base = await listen(gateway.server);
   context.after(async () => {
     await gateway.close();

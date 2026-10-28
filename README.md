@@ -1,8 +1,9 @@
 # lfm3-inference
 
 Standalone Node.js/TypeScript server for local Liquid AI multimodal and decision models.
-The gateway starts and supervises one `llama-server` process per configured model, routes requests
-by model ID, and serves both development source and compiled production builds.
+The gateway starts without loading model weights. It loads a model when its first inference
+request arrives, routes requests by model ID, and stops that model after its configured idle
+timeout. Development source and compiled production builds use the same lifecycle.
 
 The default downloads use F16 weights and projector for Omni, and Q8_0 weights and projector
 for d1. Omni F16 passed the German real-time speech round-trip that failed with Q8_0 in testing.
@@ -20,9 +21,10 @@ Liquid AI's [LFM license](https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/blob
 ## Requirements
 
 - Node.js 24.19 or newer and npm.
-- Windows x64 or Ubuntu x64 with an NVIDIA GPU and a driver compatible with the downloaded
-  CUDA runtime. The installer selects CUDA 12.4 on Windows and CUDA 12.8 on Ubuntu.
-- macOS Intel or Apple Silicon uses Metal. CUDA is not available on macOS.
+- Windows x64 or Ubuntu x64 can use an NVIDIA GPU with a compatible driver, or CPU execution.
+  The installer selects CUDA 12.4 on Windows and CUDA 12.8 on Ubuntu.
+- macOS Intel or Apple Silicon uses Metal in GPU mode, or CPU execution. CUDA is not available
+  on macOS.
 - `tar` in PATH for runtime extraction; included with current Windows, Ubuntu and macOS.
 - `ffmpeg` and `ffprobe` in PATH for video input and live media tests.
 - Enough RAM/VRAM for the configured models, projectors, context and speech decoder.
@@ -44,12 +46,15 @@ npm start
 
 For development, use `npm run dev` instead of the build/start commands. This runs TypeScript
 directly; stop and restart it after source changes. Ctrl+C stops the gateway and its runtime
-processes. Startup failure shuts down processes already started. IPC supervisors also stop their
-owned runtime trees if the gateway exits abruptly. Other Node.js or inference processes are never
-targeted for shutdown.
+processes. A failed model load cleans up its partial process and returns an inference error;
+the gateway remains available for later requests. IPC supervisors also stop their owned runtime
+trees if the gateway exits abruptly. Other Node.js or inference processes are never targeted
+for shutdown.
 
-The server becomes available after all configured models report ready. Native runtime ports
-bind only to `127.0.0.1`. The gateway binds to all interfaces by default:
+The gateway becomes available without starting native model processes. Health checks and model
+listing do not load weights. The first inference request waits for its selected model to load;
+concurrent first requests share that load. Native runtime ports bind only to `127.0.0.1`.
+The gateway binds to all interfaces by default:
 
 - Local API: `http://localhost:18080/v1`
 - LAN API: `http://<server-LAN-IP>:18080/v1`
@@ -64,18 +69,20 @@ Set a different `API_KEY` in your local `.env` before exposing the service beyon
 `.env.example` documents all gateway settings. `.env` loads automatically; environment variables
 already supplied by the process take precedence.
 
-| Variable              | Default                           | Meaning                                                     |
-| --------------------- | --------------------------------- | ----------------------------------------------------------- |
-| `HOST`                | `0.0.0.0`                         | Gateway bind address; use `127.0.0.1` for local access only |
-| `PORT`                | `18080`                           | Gateway port                                                |
-| `API_KEY`             | `change.me` in example            | Bearer or `x-api-key` credential; unset disables key checks |
-| `MODELS_CONFIG`       | `models.json`                     | Model configuration file                                    |
-| `LLAMA_SERVER_BIN`    | `vendor/llama/llama-server[.exe]` | Existing runtime executable override                        |
-| `GPU_LAYERS`          | `all`                             | llama.cpp GPU offload setting                               |
-| `STARTUP_TIMEOUT_MS`  | `180000`                          | Readiness timeout per runtime                               |
-| `SHUTDOWN_TIMEOUT_MS` | `10000`                           | Runtime termination grace period on Unix                    |
-| `REQUEST_TIMEOUT_MS`  | `300000`                          | Maximum inference request time                              |
-| `MAX_BODY_BYTES`      | `134217728`                       | Maximum HTTP request body, including base64 media           |
+| Variable              | Default                           | Meaning                                                                     |
+| --------------------- | --------------------------------- | --------------------------------------------------------------------------- |
+| `HOST`                | `0.0.0.0`                         | Gateway bind address; use `127.0.0.1` for local access only                 |
+| `PORT`                | `18080`                           | Gateway port                                                                |
+| `API_KEY`             | `change.me` in example            | Bearer or `x-api-key` credential; unset disables key checks                 |
+| `MODELS_CONFIG`       | `models.json`                     | Model configuration file                                                    |
+| `LLAMA_SERVER_BIN`    | `vendor/llama/llama-server[.exe]` | Existing runtime executable override                                        |
+| `GPU_LAYERS`          | `all`                             | Layers offloaded in GPU mode; CPU mode overrides this setting               |
+| `DEVICE`              | `gpu`                             | `gpu` or `cpu`; CPU mode disables model and projector GPU offload           |
+| `IDLE_TIMEOUT_MS`     | `300000`                          | Unload each model after this idle period; `0` keeps loaded models resident  |
+| `STARTUP_TIMEOUT_MS`  | `180000`                          | Readiness timeout per runtime                                               |
+| `SHUTDOWN_TIMEOUT_MS` | `10000`                           | Runtime termination grace period on Unix                                    |
+| `REQUEST_TIMEOUT_MS`  | `300000`                          | Timeout for a load wait or native HTTP request, not open WebSocket sessions |
+| `MAX_BODY_BYTES`      | `134217728`                       | Maximum HTTP request body, including base64 media                           |
 
 `npm run download` initializes ignored `models.json` from `models.example.json` if absent.
 Add entries with a unique `id` and backend `port`, a `role` of `omni` or `decision`, local
@@ -93,6 +100,11 @@ npm run download -- --models-only
 Both models use an 8192-token context and one slot per process. d1 also uses batch and ubatch
 sizes of 8192. A decision question, its state and media must fit in a single ubatch.
 Omni starts with `--reasoning off --jinja`, as required for its chat and tool templates.
+
+Each model has its own idle timer. A model stays loaded while a request, response stream, or
+real-time WebSocket session is active. The idle countdown starts after the last active request
+finishes. A later request reloads an unloaded model. CPU/GPU selection and idle timing live in
+this project's `.env`; restarting the gateway applies changed values.
 
 ## HTTP and WebSocket APIs
 
@@ -205,7 +217,10 @@ npm run test:live
 ```
 
 With the gateway stopped, `npm run test:lifecycle` starts real production runtimes to check
-normal shutdown, abrupt gateway exit, startup cancellation and invalid model/executable cleanup.
+unloaded startup, concurrent first requests, idle unloading/reloading, active sessions,
+normal shutdown, parent IPC disconnect, abrupt gateway exit, load cancellation and invalid
+model/executable cleanup. It also exercises CPU decisions and speech separately from GPU tests,
+checking native allocation logs and decoding generated audio.
 
 Start the server before running live tests. Tests use actual models, recorded audio/video and
 generated image fixtures. They check expected answers, decode audio and transcribe generated
@@ -223,9 +238,9 @@ On 2026-10-28, Windows with Node.js 24.19, an RTX 3090, and the pinned b11960 ru
 
 | Check                                               | Observed result                |
 | --------------------------------------------------- | ------------------------------ |
-| Gateway regression tests                            | 4 passed, 0 failed             |
-| Live inference tests, Omni F16 and d1 Q8_0          | 33 passed, 0 failed, 0 skipped |
-| Actual process lifecycle tests                      | 6 passed, 0 failed             |
+| Gateway and runtime-manager regression tests        | 18 passed, 0 failed            |
+| Latest live inference run, Omni F16 and d1 Q8_0     | 32 passed, 1 failed, 0 skipped |
+| Actual process lifecycle and CPU tests              | 14 passed, 0 failed            |
 | Localhost and host LAN-address readiness            | HTTP 200                       |
 | Formatting, lint, strict types and production build | Passed                         |
 
@@ -234,6 +249,11 @@ questions, text and media understanding, both API families and event streams, sc
 tool round trips, WAV and PCM, voices, German speech, real-time transcription, conversation
 memory, spoken visual questions and speech translation. Generated audio is decoded and checked
 for non-silence, then transcribed to verify expected words.
+
+The latest live run failed the German generated-speech transcription round-trip: translated
+text contained the expected words and the audio decoded, but the model's transcription of that
+audio missed expected German words. The strict test remains unchanged. An earlier complete F16
+run passed all 33 cases; these samples show variation in speech generation or recognition.
 
 The earlier Q8_0 Omni configuration failed a German real-time speech round-trip. The F16
 configuration passed both a focused comparison and the complete live suite. The failed Q8_0

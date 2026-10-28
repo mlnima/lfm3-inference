@@ -1,9 +1,10 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { RunningModel, ServerConfig } from '../config/types.js';
+import type { RuntimeManager, ServerConfig } from '../config/types.js';
 import { readBody, readForm, readJson } from '../http/body.js';
 import { proxy } from '../http/proxy.js';
 import { sendError, sendJson } from '../http/response.js';
 import { selectModel } from '../http/selectModel.js';
+import { acquireModel } from '../http/modelLease.js';
 import { speechRequest, transcribe, transcriptionRequest } from './audio.js';
 
 const inferencePaths = new Set([
@@ -27,8 +28,9 @@ export const handleRequest = async (
   request: IncomingMessage,
   response: ServerResponse,
   config: ServerConfig,
-  models: RunningModel[],
+  runtimes: RuntimeManager,
 ): Promise<void> => {
+  const models = runtimes.models;
   response.setHeader('access-control-allow-origin', '*');
   response.setHeader('access-control-allow-methods', 'GET, POST, OPTIONS');
   response.setHeader(
@@ -73,6 +75,7 @@ export const handleRequest = async (
       sendError(response, 400, 'Transcription response_format must be json or text.');
       return;
     }
+    if (!(await acquireModel(runtimes, model.id, response, config.requestTimeoutMs))) return;
     const abort = new AbortController();
     response.once('close', () => abort.abort());
     const result = await transcribe(
@@ -96,6 +99,7 @@ export const handleRequest = async (
     sendError(response, 404, 'Unknown model for this endpoint.');
     return;
   }
+  if (!(await acquireModel(runtimes, model.id, response, config.requestTimeoutMs))) return;
   if (path === '/v1/audio/speech') {
     proxy(
       request,
