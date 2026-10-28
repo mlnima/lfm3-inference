@@ -1,0 +1,42 @@
+{
+  "models": [
+    {
+      "id": "lfm3-omni-2b",
+      "role": "omni",
+      "modelPath": "models/LFM3-Omni-2B-F16.gguf",
+      "projectorPath": "models/mmproj-LFM3-Omni-2B-F16.gguf",
+      "port": 18081,
+      "downloads": [
+        {
+          "path": "models/LFM3-Omni-2B-F16.gguf",
+          "url": "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/resolve/5e850dad8e109c728e99d24660fed65bb3c2c362/LFM3-Omni-2B-F16.gguf",
+          "sha256": "9fde8072a7313d676591499d14ecf7f7ee2f1773cc9e4bdbdbeed4a87c5987f6"
+        },
+        {
+          "path": "models/mmproj-LFM3-Omni-2B-F16.gguf",
+          "url": "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF/resolve/5e850dad8e109c728e99d24660fed65bb3c2c362/mmproj-LFM3-Omni-2B-F16.gguf",
+          "sha256": "361bc95192c7d9156b566fcd4e48930363b78218e493fb1be607456bd51586e3"
+        }
+      ]
+    },
+    {
+      "id": "d1-omni-2b",
+      "role": "decision",
+      "modelPath": "models/d1-Omni-2B-Q8_0.gguf",
+      "projectorPath": "models/mmproj-d1-Omni-2B-Q8_0.gguf",
+      "port": 18082,
+      "downloads": [
+        {
+          "path": "models/d1-Omni-2B-Q8_0.gguf",
+          "url": "https://huggingface.co/LiquidAI/d1-Omni-2B-GGUF/resolve/c53ae0b1f92b17065e9158d34019c9ca1ea5bcf8/d1-Omni-2B-Q8_0.gguf",
+          "sha256": "aedf1a7c341b4281979423dbc39e9c3d3ad1da8834156c8e75af5399ca3b0861"
+        },
+        {
+          "path": "models/mmproj-d1-Omni-2B-Q8_0.gguf",
+          "url": "https://huggingface.co/LiquidAI/d1-Omni-2B-GGUF/resolve/c53ae0b1f92b17065e9158d34019c9ca1ea5bcf8/mmproj-d1-Omni-2B-Q8_0.gguf",
+          "sha256": "31778160ac0ec70f9b59f296aa1c8e70cbd1eb7e3a3ff873d695aaa4c7b8d674"
+        }
+      ]
+    }
+  ]
+}

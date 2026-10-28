@@ -1,0 +1,35 @@
+{
+  "name": "lfm3-inference",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone multimodal and decision inference with llama.cpp",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.19.0"
+  },
+  "scripts": {
+    "download": "tsx scripts/download.ts",
+    "dev": "tsx src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.check.json",
+    "start": "node dist/main.js",
+    "test": "tsx --test tests/unit*.test.ts",
+    "test:live": "tsx --test --test-concurrency=1 tests/live*.test.ts",
+    "test:lifecycle": "tsx --test --test-concurrency=1 tests/runtimeLifecycle.ts",
+    "lint": "eslint src scripts tests",
+    "format": "prettier --write . --ignore-path .gitignore",
+    "format:check": "prettier --check . --ignore-path .gitignore",
+    "check:limits": "node scripts/check-limits.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/ws": "8.18.1",
+    "eslint": "9.39.1",
+    "prettier": "3.6.2",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.2",
+    "ws": "8.18.3"
+  }
+}

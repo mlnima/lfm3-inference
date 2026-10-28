@@ -1,0 +1,13 @@
+node_modules/
+dist/
+vendor/
+models/
+artifacts/
+coverage/
+.env
+.env.*
+!.env.example
+models.json
+*.log
+*.tsbuildinfo
+.DS_Store
