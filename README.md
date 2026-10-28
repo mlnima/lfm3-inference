@@ -108,23 +108,33 @@ this project's `.env`; restarting the gateway applies changed values.
 
 ## HTTP and WebSocket APIs
 
+Context and token helpers accept a JSON body containing `model`. They authenticate and load
+that selected model on demand. `/v1/context` reads the native runtime's actual context/slot
+allocation. For identified `lfm3a` audio projectors, it reports the verified 16 kHz input and
+1,280 input samples per context token; unidentified encoders do not receive this profile.
+Template and token helpers forward native bodies to `/apply-template` and `/tokenize`.
+Health checks and model listing still start no model processes.
+
 The [pinned llama.cpp server documentation](https://github.com/ggml-org/llama.cpp/blob/b11960/tools/server/README.md)
 defines the native request and response formats. The gateway preserves native errors,
 event streams, tool calls and audio bytes.
 
-| Endpoint                             | Model role | Notes                                                         |
-| ------------------------------------ | ---------- | ------------------------------------------------------------- |
-| `GET /v1/models`                     | Both       | Configured model IDs                                          |
-| `POST /v1/chat/completions`          | Omni       | OpenAI chat, tools, structured output, SSE                    |
-| `POST /v1/responses`                 | Omni       | Native OpenAI Responses compatibility                         |
-| `POST /v1/completions`               | Omni       | OpenAI text completions                                       |
-| `POST /v1/messages`                  | Omni       | Anthropic Messages and SSE                                    |
-| `POST /v1/messages/count_tokens`     | Omni       | Anthropic token counting                                      |
-| `POST /v1/systemone`                 | Decision   | Native TypeSafe-compatible decisions                          |
-| `POST /tts`                          | Omni       | Native WAV/float32 PCM synthesis, optional streaming          |
-| `POST /v1/audio/speech`              | Omni       | OpenAI-style synthesis; WAV or signed PCM16 at 24 kHz         |
-| `POST /v1/audio/transcriptions`      | Omni       | Multipart ASR; `file`, `model`, `language`, `response_format` |
-| `WS /v1/realtime?model=lfm3-omni-2b` | Omni       | Native text/audio conversation and transcription              |
+| Endpoint                             | Model role | Notes                                                              |
+| ------------------------------------ | ---------- | ------------------------------------------------------------------ |
+| `GET /v1/models`                     | Both       | Configured model IDs                                               |
+| `POST /v1/context`                   | Omni       | Actual runtime context, slots, and identified audio encoder budget |
+| `POST /v1/tokenize`                  | Omni       | Native tokenizer for precise text token counts                     |
+| `POST /v1/apply-template`            | Omni       | Native template rendering, including supplied tool definitions     |
+| `POST /v1/chat/completions`          | Omni       | OpenAI chat, tools, structured output, SSE                         |
+| `POST /v1/responses`                 | Omni       | Native OpenAI Responses compatibility                              |
+| `POST /v1/completions`               | Omni       | OpenAI text completions                                            |
+| `POST /v1/messages`                  | Omni       | Anthropic Messages and SSE                                         |
+| `POST /v1/messages/count_tokens`     | Omni       | Anthropic token counting                                           |
+| `POST /v1/systemone`                 | Decision   | Native TypeSafe-compatible decisions                               |
+| `POST /tts`                          | Omni       | Native WAV/float32 PCM synthesis, optional streaming               |
+| `POST /v1/audio/speech`              | Omni       | OpenAI-style synthesis; WAV or signed PCM16 at 24 kHz              |
+| `POST /v1/audio/transcriptions`      | Omni       | Multipart ASR; `file`, `model`, `language`, `response_format`      |
+| `WS /v1/realtime?model=lfm3-omni-2b` | Omni       | Native text/audio conversation and transcription                   |
 
 Supply the exact configured `model` ID. Omitting it selects the first model with the required
 role. Native `/tts` also accepts multipart audio reference uploads. Transcription returns
@@ -238,7 +248,7 @@ On 2026-10-28, Windows with Node.js 24.19, an RTX 3090, and the pinned b11960 ru
 
 | Check                                               | Observed result                |
 | --------------------------------------------------- | ------------------------------ |
-| Gateway and runtime-manager regression tests        | 18 passed, 0 failed            |
+| Gateway and runtime-manager regression tests        | 20 passed, 0 failed            |
 | Latest live inference run, Omni F16 and d1 Q8_0     | 32 passed, 1 failed, 0 skipped |
 | Actual process lifecycle and CPU tests              | 14 passed, 0 failed            |
 | Localhost and host LAN-address readiness            | HTTP 200                       |

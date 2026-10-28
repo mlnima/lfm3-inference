@@ -6,6 +6,7 @@ import { sendError, sendJson } from '../http/response.js';
 import { selectModel } from '../http/selectModel.js';
 import { acquireModel } from '../http/modelLease.js';
 import { speechRequest, transcribe, transcriptionRequest } from './audio.js';
+import { runtimeContext } from './runtimeContext.js';
 
 const inferencePaths = new Set([
   '/v1/chat/completions',
@@ -19,6 +20,9 @@ const inferencePaths = new Set([
   '/tts',
   '/v1/audio/speech',
   '/v1/audio/transcriptions',
+  '/v1/context',
+  '/v1/tokenize',
+  '/v1/apply-template',
 ]);
 
 export const authorized = (request: IncomingMessage, key?: string): boolean =>
@@ -100,6 +104,14 @@ export const handleRequest = async (
     return;
   }
   if (!(await acquireModel(runtimes, model.id, response, config.requestTimeoutMs))) return;
+  if (path === '/v1/context') {
+    await runtimeContext(model, response, config.requestTimeoutMs);
+    return;
+  }
+  if (path === '/v1/tokenize' || path === '/v1/apply-template') {
+    proxy(request, response, model, path.replace('/v1', ''), bytes, config.requestTimeoutMs);
+    return;
+  }
   if (path === '/v1/audio/speech') {
     proxy(
       request,
